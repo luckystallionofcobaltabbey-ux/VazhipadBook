@@ -28,12 +28,13 @@ export function ReceiptModal({
   onClose,
   onCancelBooking,
 }: ReceiptModalProps) {
-  const { isAdmin } = useFirebase();
+  const { currentUser } = useFirebase();
   if (!booking) return null;
 
   const templeInfo = PALAKKAD_TEMPLES.find((t) => t.id === booking.templeId);
   const isCancelled = booking.bookingStatus === 'CANCELLED';
-  const eligibility = getCancellationEligibility(booking, isAdmin);
+  const isOwner = Boolean(currentUser && booking.userId === currentUser.uid);
+  const eligibility = getCancellationEligibility(booking);
 
   const qrPayload = JSON.stringify({
     bookingId: booking.bookingId,
@@ -294,8 +295,17 @@ export function ReceiptModal({
             </div>
           ) : (
             <div className="no-print bg-[#FAF3E6] border border-[#E5D3B3] rounded-xl px-4 py-2.5 text-[11px] text-[#6B5E57]">
-              <strong className="text-[#7A1C1C]">Cancellation Slot:</strong>{' '}
-              {eligibility.reason}
+              {isOwner ? (
+                <>
+                  <strong className="text-[#7A1C1C]">Cancellation Slot:</strong>{' '}
+                  {eligibility.reason}
+                </>
+              ) : (
+                <>
+                  <strong className="text-[#7A1C1C]">Cancellation Policy:</strong>{' '}
+                  Consumer-only cancellation (devotees may cancel up to the previous day of pooja).
+                </>
+              )}
             </div>
           )}
 
@@ -317,7 +327,7 @@ export function ReceiptModal({
               <Download className="w-4 h-4" />
               Download Receipt
             </button>
-            {!isCancelled && eligibility.eligible && onCancelBooking && (
+            {isOwner && !isCancelled && eligibility.eligible && onCancelBooking && (
               <button
                 type="button"
                 onClick={() => onCancelBooking(booking)}

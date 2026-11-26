@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, CalendarX2, X } from 'lucide-react';
+import { CalendarX2, X } from 'lucide-react';
 import { useFirebase } from '../contexts/FirebaseContext';
 import { formatINR, getCancellationEligibility } from '../data/temples';
 import type { BookingRecord } from '../types';
@@ -22,7 +22,7 @@ export function CancelBookingModal({
   onClose,
   onCancelled,
 }: CancelBookingModalProps) {
-  const { cancelBooking, isAdmin } = useFirebase();
+  const { cancelBooking } = useFirebase();
   const [selectedReason, setSelectedReason] = useState<string>(PRESET_REASONS[0]);
   const [customReason, setCustomReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -38,7 +38,7 @@ export function CancelBookingModal({
 
   if (!booking) return null;
 
-  const eligibility = getCancellationEligibility(booking, isAdmin);
+  const eligibility = getCancellationEligibility(booking);
   const effectiveReason =
     selectedReason === 'Other' ? customReason.trim() : selectedReason;
 
@@ -126,12 +126,6 @@ export function CancelBookingModal({
             <p className="text-[#6B5E57] leading-relaxed">
               {eligibility.reason}
             </p>
-            {isAdmin && eligibility.isPastDeadline && (
-              <div className="pt-1 flex items-center gap-1.5 text-amber-800 font-medium">
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                <span>Admin override active for past-cutoff cancellation.</span>
-              </div>
-            )}
           </div>
 
           <div>

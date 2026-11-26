@@ -1,17 +1,15 @@
 import { useMemo, useState } from 'react';
-import { Ban, QrCode, Search, ShieldCheck, X } from 'lucide-react';
+import { QrCode, Search, ShieldCheck, X } from 'lucide-react';
 import { ADMIN_EMAIL, useFirebase } from '../contexts/FirebaseContext';
 import { formatINR, formatPoojaDateDisplay, PALAKKAD_TEMPLES } from '../data/temples';
 import type { BookingRecord } from '../types';
 
 interface AdminBookingsViewProps {
   onSelectReceipt: (booking: BookingRecord) => void;
-  onCancelBooking: (booking: BookingRecord) => void;
 }
 
 export function AdminBookingsView({
   onSelectReceipt,
-  onCancelBooking,
 }: AdminBookingsViewProps) {
   const {
     isAdmin,
@@ -20,7 +18,7 @@ export function AdminBookingsView({
     adminBookingsError,
   } = useFirebase();
 
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'CONFIRMED' | 'CANCELLED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'CONFIRMED' | 'CANCELLED' | 'ALL'>('CONFIRMED');
   const [templeFilter, setTempleFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -53,7 +51,7 @@ export function AdminBookingsView({
             Admin Access Required
           </h1>
           <p className="text-sm text-[#6B5E57]">
-            Please sign in with the authorized admin account ({ADMIN_EMAIL}) to manage temple bookings.
+            Please sign in with an authorized temple administrator Google account to manage temple bookings.
           </p>
         </div>
       </section>
@@ -153,22 +151,22 @@ export function AdminBookingsView({
           </select>
 
           <div className="flex items-center gap-1 p-1 bg-[#F2E7D3] border border-[#E5D3B3] rounded-xl">
-            {(['ALL', 'CONFIRMED', 'CANCELLED'] as const).map((status) => (
+            {(['CONFIRMED', 'CANCELLED', 'ALL'] as const).map((status) => (
               <button
                 key={status}
                 type="button"
                 onClick={() => setStatusFilter(status)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap cursor-pointer transition-colors ${
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap cursor-pointer transition-colors tabular-nums ${
                   statusFilter === status
                     ? 'bg-[#7A1C1C] text-white font-semibold'
                     : 'text-[#5C4E45] hover:text-[#1F1815]'
                 }`}
               >
-                {status === 'ALL'
-                  ? 'All'
-                  : status === 'CONFIRMED'
-                  ? 'Confirmed'
-                  : 'Cancelled'}
+                {status === 'CONFIRMED'
+                  ? `Active (${confirmedList.length})`
+                  : status === 'CANCELLED'
+                  ? `Cancelled (${cancelledList.length})`
+                  : `All (${adminBookings.length})`}
               </button>
             ))}
           </div>
@@ -268,17 +266,6 @@ export function AdminBookingsView({
                     <QrCode className="w-4 h-4" />
                     Ticket
                   </button>
-
-                  {!isCancelled && (
-                    <button
-                      type="button"
-                      onClick={() => onCancelBooking(booking)}
-                      className="min-h-[40px] px-3.5 py-2 rounded-xl border border-red-200 bg-red-50 hover:bg-[#7A1C1C] text-[#7A1C1C] hover:text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                      <Ban className="w-4 h-4" />
-                      Cancel
-                    </button>
-                  )}
                 </div>
               </article>
             );

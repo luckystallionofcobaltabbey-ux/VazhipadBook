@@ -1,8 +1,31 @@
+# Dependencies
 node_modules/
+
+# Build & PWA generated artifacts
 build/
 dist/
+dev-dist/
 coverage/
+
+# OS & Logs
 .DS_Store
 *.log
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# Environment & Sensitive Configs (never commit plaintext secrets)
 .env*
 !.env.example
+firebase-applet-config.json
+.firebase/
+
+# Private keys, certificates & service accounts
+*.pem
+*.key
+*.p12
+*.jks
+*serviceAccount*.json
+*-firebase-adminsdk-*.json
+.secrets.key
+.secrets.pass

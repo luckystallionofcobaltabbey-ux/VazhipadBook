@@ -254,13 +254,8 @@ service cloud.firestore {
       allow update: if isSignedIn()
         && isValidId(bookingId)
         && isValidBookingCancel(incoming(), bookingId)
-        && (
-          isAdmin()
-          || (
-            existing().userId == request.auth.uid
-            && (!('cancellationDeadline' in existing()) || request.time <= existing().cancellationDeadline)
-          )
-        )
+        && existing().userId == request.auth.uid
+        && (!('cancellationDeadline' in existing()) || request.time <= existing().cancellationDeadline)
         && (!('bookingStatus' in existing()) || existing().bookingStatus != 'CANCELLED')
         && incoming().bookingId == existing().bookingId
         && incoming().userId == existing().userId

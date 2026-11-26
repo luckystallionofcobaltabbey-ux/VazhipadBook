@@ -524,7 +524,6 @@ export function getCancellationEligibility(
     cancellationDeadline?: unknown;
     items: { poojaDate: string }[];
   },
-  isAdmin: boolean,
   now: Date = new Date()
 ): CancellationEligibility {
   const earliestISO = getEarliestPoojaDateISO(booking.items);
@@ -557,19 +556,6 @@ export function getCancellationEligibility(
   }
 
   const isPastDeadline = now.getTime() > deadlineDate.getTime();
-
-  if (isAdmin) {
-    return {
-      eligible: true,
-      isCancelled: false,
-      isPastDeadline,
-      deadlineLabel,
-      earliestDateLabel,
-      reason: isPastDeadline
-        ? 'Past devotee cutoff · Admin cancellation override available.'
-        : `Open for cancellation until ${deadlineLabel}.`,
-    };
-  }
 
   if (isPastDeadline) {
     return {

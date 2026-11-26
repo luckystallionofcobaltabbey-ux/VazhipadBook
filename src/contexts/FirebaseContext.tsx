@@ -29,6 +29,11 @@ import {
   isFirebaseConfigured,
   OperationType,
 } from '../firebaseConfig';
+import {
+  getEncryptedItem,
+  removeEncryptedItem,
+  setEncryptedItem,
+} from '../utils/secureStorage';
 import type {
   BookingItem,
   BookingRecord,
@@ -38,7 +43,10 @@ import type {
   UserProfile,
 } from '../types';
 
-export const ADMIN_EMAIL = 'luckystallionofcobaltabbey@gmail.com';
+export const ADMIN_EMAIL = (
+  import.meta.env.VITE_ADMIN_EMAIL || 'luckystallionofcobaltabbey@gmail.com'
+).toLowerCase();
+const ENCRYPTED_BOOKINGS_KEY = 'vb_bookings_cache_v1';
 
 interface CreateBookingInput {
   templeId: string;
@@ -245,8 +253,19 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    let cancelled = false;
     setBookingsLoading(true);
     setBookingsError(null);
+
+    // Hydrate AES-256-GCM encrypted offline cache bound to this user UID
+    void getEncryptedItem<BookingRecord[]>(
+      ENCRYPTED_BOOKINGS_KEY,
+      currentUser.uid
+    ).then((cached) => {
+      if (!cancelled && cached && cached.length > 0) {
+        setBookings((prev) => (prev.length === 0 ? cached : prev));
+      }
+    });
 
     const bookingsQuery = query(
       collection(db, 'bookings'),
@@ -262,15 +281,25 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         list.sort((a, b) => (b.createdAtMillis ?? 0) - (a.createdAtMillis ?? 0));
         setBookings(list);
         setBookingsLoading(false);
+        void setEncryptedItem(ENCRYPTED_BOOKINGS_KEY, list, currentUser.uid);
       },
       (error) => {
         setBookingsLoading(false);
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          setBookingsError(
+            'Offline — showing encrypted locally cached bookings.'
+          );
+          return;
+        }
         setBookingsError('Unable to load cloud bookings.');
         handleFirestoreError(error, OperationType.LIST, 'bookings');
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [authReady, currentUser]);
 
   // Real-time Firestore listener for Admin (all bookings)
@@ -341,6 +370,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async (): Promise<void> => {
+    removeEncryptedItem(ENCRYPTED_BOOKINGS_KEY);
     if (!isFirebaseConfigured) return;
     await signOut(auth);
   };
@@ -458,8 +488,11 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
     if (!currentUser) {
       throw new Error('Authentication required to cancel booking.');
     }
+    if (booking.userId !== currentUser.uid) {
+      throw new Error('Only the booking owner can cancel this Vazhipadu.');
+    }
 
-    const eligibility = getCancellationEligibility(booking, isAdmin);
+    const eligibility = getCancellationEligibility(booking);
     if (!eligibility.eligible) {
       throw new Error(eligibility.reason);
     }

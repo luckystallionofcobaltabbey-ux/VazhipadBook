@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Ban, Calendar, Clock, QrCode, Ticket } from 'lucide-react';
 import { useFirebase } from '../contexts/FirebaseContext';
 import {
@@ -20,8 +21,9 @@ export function MyBookingsView({
   onExploreTemples,
   onOpenSignIn,
 }: MyBookingsViewProps) {
-  const { currentUser, isAdmin, bookings, bookingsLoading, bookingsError } =
+  const { currentUser, bookings, bookingsLoading, bookingsError } =
     useFirebase();
+  const [activeTab, setActiveTab] = useState<'ACTIVE' | 'CANCELLED'>('ACTIVE');
 
   if (!currentUser) {
     return (
@@ -48,6 +50,15 @@ export function MyBookingsView({
     );
   }
 
+  const activeBookings = bookings.filter(
+    (b) => (b.bookingStatus || 'CONFIRMED') !== 'CANCELLED'
+  );
+  const cancelledBookings = bookings.filter(
+    (b) => b.bookingStatus === 'CANCELLED'
+  );
+  const visibleBookings =
+    activeTab === 'ACTIVE' ? activeBookings : cancelledBookings;
+
   return (
     <section className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10 pb-28 md:pb-14">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-6 border-b border-[#E5D3B3]">
@@ -67,6 +78,43 @@ export function MyBookingsView({
           Book Another Vazhipadu
         </button>
       </div>
+
+      {!bookingsLoading && bookings.length > 0 && (
+        <div className="mt-6 flex items-center justify-between gap-4">
+          <div
+            className="inline-flex items-center gap-1 p-1 bg-[#F2E7D3] border border-[#E5D3B3] rounded-xl"
+            role="tablist"
+            aria-label="Filter bookings by status"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'ACTIVE'}
+              onClick={() => setActiveTab('ACTIVE')}
+              className={`px-3.5 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap cursor-pointer transition-colors tabular-nums ${
+                activeTab === 'ACTIVE'
+                  ? 'bg-[#7A1C1C] text-white font-semibold'
+                  : 'text-[#5C4E45] hover:text-[#1F1815]'
+              }`}
+            >
+              Active Bookings ({activeBookings.length})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'CANCELLED'}
+              onClick={() => setActiveTab('CANCELLED')}
+              className={`px-3.5 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap cursor-pointer transition-colors tabular-nums ${
+                activeTab === 'CANCELLED'
+                  ? 'bg-[#7A1C1C] text-white font-semibold'
+                  : 'text-[#5C4E45] hover:text-[#1F1815]'
+              }`}
+            >
+              Cancelled ({cancelledBookings.length})
+            </button>
+          </div>
+        </div>
+      )}
 
       {bookingsError && (
         <div
@@ -109,11 +157,36 @@ export function MyBookingsView({
             Explore Palakkad Temples
           </button>
         </div>
+      ) : visibleBookings.length === 0 ? (
+        <div className="mt-6 bg-[#FFFDF9] border border-[#E5D3B3] rounded-2xl p-10 text-center">
+          <div className="w-12 h-12 rounded-xl bg-[#FAF3E6] border border-[#E5D3B3] text-[#D97706] flex items-center justify-center mx-auto mb-4">
+            <Calendar className="w-6 h-6" />
+          </div>
+          <h2 className="font-display text-xl font-semibold text-[#1F1815] mb-1.5">
+            {activeTab === 'ACTIVE'
+              ? 'No active Vazhipadu bookings'
+              : 'No cancelled bookings'}
+          </h2>
+          <p className="text-sm text-[#6B5E57] max-w-sm mx-auto mb-6">
+            {activeTab === 'ACTIVE'
+              ? 'All previous bookings have been moved to the Cancelled tab. Schedule a new pooja anytime.'
+              : 'Bookings you cancel prior to the pooja date will appear here for your reference.'}
+          </p>
+          {activeTab === 'ACTIVE' && (
+            <button
+              type="button"
+              onClick={onExploreTemples}
+              className="min-h-[44px] px-5 py-2.5 rounded-xl bg-[#7A1C1C] hover:bg-[#611414] text-white text-sm font-semibold transition-colors cursor-pointer"
+            >
+              Explore Palakkad Temples
+            </button>
+          )}
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-          {bookings.map((booking) => {
+          {visibleBookings.map((booking) => {
             const isCancelled = booking.bookingStatus === 'CANCELLED';
-            const eligibility = getCancellationEligibility(booking, isAdmin);
+            const eligibility = getCancellationEligibility(booking);
 
             return (
               <article

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AlertCircle,
   Building2,
@@ -15,11 +15,18 @@ import { DevoteeDetailsModal } from './components/DevoteeDetailsModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ExploreTemplesView } from './components/ExploreTemplesView';
 import { MyBookingsView } from './components/MyBookingsView';
+import { OfflineIndicator } from './components/OfflineIndicator';
+import { PWAInstallButton } from './components/PWAInstallButton';
 import { ReceiptModal } from './components/ReceiptModal';
 import { SignInModal } from './components/SignInModal';
 import { TempleDetailView } from './components/TempleDetailView';
 import { FirebaseProvider, useFirebase } from './contexts/FirebaseContext';
 import { PALAKKAD_TEMPLES } from './data/temples';
+import {
+  getEncryptedItem,
+  removeEncryptedItem,
+  setEncryptedItem,
+} from './utils/secureStorage';
 import type {
   ActiveView,
   BookingRecord,
@@ -28,6 +35,8 @@ import type {
   PrasadamDeliveryMode,
   Temple,
 } from './types';
+
+const ENCRYPTED_CART_KEY = 'vb_cart_v1';
 
 function VazhipaduBookShell() {
   const { currentUser, userProfile, isAdmin, logout, isConfigured } =
@@ -38,12 +47,45 @@ function VazhipaduBookShell() {
     PALAKKAD_TEMPLES[0].id
   );
 
-  // Cart State
+  // Cart State (persisted encrypted at rest in browser storage)
   const [cart, setCart] = useState<CartItem[]>([]);
   const [prasadamDelivery, setPrasadamDelivery] =
     useState<PrasadamDeliveryMode>('Counter Pickup');
+  const [cartHydrated, setCartHydrated] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [autoAdvanceToCheckout, setAutoAdvanceToCheckout] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void getEncryptedItem<{
+      cart: CartItem[];
+      prasadamDelivery: PrasadamDeliveryMode;
+    }>(ENCRYPTED_CART_KEY).then((saved) => {
+      if (!active) return;
+      if (saved && Array.isArray(saved.cart) && saved.cart.length > 0) {
+        setCart(saved.cart);
+        if (
+          saved.prasadamDelivery === 'Counter Pickup' ||
+          saved.prasadamDelivery === 'Speed Post'
+        ) {
+          setPrasadamDelivery(saved.prasadamDelivery);
+        }
+      }
+      setCartHydrated(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!cartHydrated) return;
+    if (cart.length === 0) {
+      removeEncryptedItem(ENCRYPTED_CART_KEY);
+      return;
+    }
+    void setEncryptedItem(ENCRYPTED_CART_KEY, { cart, prasadamDelivery });
+  }, [cart, prasadamDelivery, cartHydrated]);
 
   // Modals
   const [poojaModalState, setPoojaModalState] = useState<{
@@ -239,8 +281,9 @@ function VazhipaduBookShell() {
             )}
           </nav>
 
-          {/* Zone 3: Single Primary Account / Sign-In Action */}
-          <div className="flex items-center gap-3 shrink-0">
+          {/* Zone 3: Install App + Account / Sign-In Action */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <PWAInstallButton />
             {currentUser ? (
               <div className="flex items-center gap-2">
                 <button
@@ -316,7 +359,6 @@ function VazhipaduBookShell() {
         {activeView === 'admin' && (
           <AdminBookingsView
             onSelectReceipt={(booking) => setActiveReceipt(booking)}
-            onCancelBooking={(booking) => setCancelTargetBooking(booking)}
           />
         )}
       </main>
@@ -543,6 +585,9 @@ function VazhipaduBookShell() {
           setCancelTargetBooking(null);
         }}
       />
+
+      {/* Offline Connectivity Indicator */}
+      <OfflineIndicator />
     </div>
   );
 }
