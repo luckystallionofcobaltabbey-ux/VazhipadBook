@@ -1,0 +1,218 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated devotee account profile stored under users/{userId}.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID matching the document ID."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Devotee display name."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 160,
+          "description": "Devotee email address."
+        },
+        "phone": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 20,
+          "description": "Optional phone number for temple and prasadam updates."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when user profile was first created."
+        },
+        "lastLoginAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the user's most recent login."
+        }
+      },
+      "required": ["uid", "name", "email", "createdAt", "lastLoginAt"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Completed E-Vazhipadu temple booking receipt stored in bookings/{bookingId}.",
+      "type": "object",
+      "properties": {
+        "bookingId": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 32,
+          "pattern": "^PKD-[0-9]{4}-[A-Z0-9]{4,12}$",
+          "description": "Unique Palakkad booking reference ID."
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Authenticated user's Firebase UID."
+        },
+        "customerName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Account holder's full name."
+        },
+        "customerEmail": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 160,
+          "description": "Account holder's email."
+        },
+        "customerPhone": {
+          "type": "string",
+          "minLength": 7,
+          "maxLength": 20,
+          "description": "Phone number captured at checkout."
+        },
+        "templeId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-z0-9\\-]+$",
+          "description": "Identifier of the Palakkad temple."
+        },
+        "templeName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "description": "Display name of the temple."
+        },
+        "items": {
+          "type": "array",
+          "description": "Bounded list (1 to 25) of booked pooja items with devotee and nakshatra details."
+        },
+        "prasadamDelivery": {
+          "type": "string",
+          "enum": ["Counter Pickup", "Speed Post"],
+          "description": "Prasadam fulfillment option."
+        },
+        "deliveryAddress": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 400,
+          "description": "Postal delivery address (required when Speed Post is chosen)."
+        },
+        "subtotalAmount": {
+          "type": "number",
+          "description": "Sum of pooja item subtotals in INR."
+        },
+        "convenienceFee": {
+          "type": "number",
+          "description": "Platform convenience fee in INR (5)."
+        },
+        "deliveryFee": {
+          "type": "number",
+          "description": "Speed Post delivery fee in INR (0 or 50)."
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "Total paid amount in INR."
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["UPI", "Credit/Debit Card", "NetBanking"],
+          "description": "Selected payment method."
+        },
+        "transactionId": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 64,
+          "description": "Payment gateway reference ID."
+        },
+        "paymentStatus": {
+          "type": "string",
+          "enum": ["SUCCESS"],
+          "description": "Terminal payment status."
+        },
+        "bookingStatus": {
+          "type": "string",
+          "enum": ["CONFIRMED", "CANCELLED"],
+          "description": "Booking lifecycle status; transitions from CONFIRMED to CANCELLED."
+        },
+        "cancellationDeadline": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Cutoff timestamp (11:59:59 PM IST on the day prior to earliest poojaDate) for devotee cancellation."
+        },
+        "cancelledAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when booking was cancelled."
+        },
+        "cancellationReason": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 240,
+          "description": "Optional reason provided when cancelling a booking."
+        },
+        "cancelledBy": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 160,
+          "description": "Email or role of the user/admin who cancelled the booking."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of booking creation."
+        },
+        "deviceType": {
+          "type": "string",
+          "enum": ["Mobile", "Desktop"],
+          "description": "Client device classification."
+        }
+      },
+      "required": [
+        "bookingId",
+        "userId",
+        "customerName",
+        "customerEmail",
+        "customerPhone",
+        "templeId",
+        "templeName",
+        "items",
+        "prasadamDelivery",
+        "deliveryAddress",
+        "subtotalAmount",
+        "convenienceFee",
+        "deliveryFee",
+        "totalAmount",
+        "paymentMethod",
+        "transactionId",
+        "paymentStatus",
+        "bookingStatus",
+        "cancellationDeadline",
+        "createdAt",
+        "deviceType"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private devotee profile documents, readable and writable only by the matching authenticated owner."
+    },
+    "/bookings/{bookingId}": {
+      "schema": { "$ref": "#/entities/Booking" },
+      "description": "Immutable E-Vazhipadu booking receipts owned by a specific authenticated user."
+    }
+  }
+}

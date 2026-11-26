@@ -1,0 +1,6 @@
+{
+  "name": "VazhipaduBook",
+  "description": "Book authentic temple poojas, vazhipadus, and prasadam offerings across Palakkad's heritage temples.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,281 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: Deny all unspecified paths by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Reusable Hardened Global Helpers
+    // -------------------------------------------------------------------------
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn()
+        && request.auth.token.email == 'luckystallionofcobaltabbey@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin()
+        || (isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+    }
+
+    // -------------------------------------------------------------------------
+    // Validation Blueprints: UserProfile (/users/{userId})
+    // -------------------------------------------------------------------------
+    function isValidUserFields(data) {
+      return data.uid is string
+        && data.uid.size() >= 1
+        && data.uid.size() <= 128
+        && data.uid.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.uid == request.auth.uid
+        && data.name is string
+        && data.name.size() >= 1
+        && data.name.size() <= 120
+        && data.email is string
+        && data.email.size() >= 3
+        && data.email.size() <= 160
+        && (!('phone' in data) || (data.phone is string && data.phone.size() <= 20))
+        && data.createdAt is timestamp
+        && data.lastLoginAt is timestamp;
+    }
+
+    function isValidUserCreate(data) {
+      return data.keys().hasAll(['uid', 'name', 'email', 'createdAt', 'lastLoginAt'])
+        && data.keys().hasOnly(['uid', 'name', 'email', 'phone', 'createdAt', 'lastLoginAt'])
+        && isValidUserFields(data)
+        && data.createdAt == request.time
+        && data.lastLoginAt == request.time;
+    }
+
+    function isValidUserUpdate(data) {
+      return data.keys().hasAll(['uid', 'name', 'email', 'createdAt', 'lastLoginAt'])
+        && data.keys().hasOnly(['uid', 'name', 'email', 'phone', 'createdAt', 'lastLoginAt'])
+        && isValidUserFields(data)
+        && data.uid == existing().uid
+        && data.createdAt == existing().createdAt
+        && data.lastLoginAt == request.time;
+    }
+
+    // -------------------------------------------------------------------------
+    // Validation Blueprints: Booking (/bookings/{bookingId})
+    // -------------------------------------------------------------------------
+    function isValidPrasadamAndDelivery(data) {
+      return (data.prasadamDelivery == 'Counter Pickup'
+          && data.deliveryFee == 0
+          && data.deliveryAddress is string
+          && data.deliveryAddress.size() <= 400)
+        || (data.prasadamDelivery == 'Speed Post'
+          && data.deliveryFee == 50
+          && data.deliveryAddress is string
+          && data.deliveryAddress.size() >= 10
+          && data.deliveryAddress.size() <= 400);
+    }
+
+    function isValidBookingCore(data, bookingId) {
+      return data.bookingId is string
+        && data.bookingId == bookingId
+        && data.bookingId.size() >= 8
+        && data.bookingId.size() <= 32
+        && data.bookingId.matches('^PKD-[0-9]{4}-[A-Z0-9]{4,12}$')
+        && data.userId is string
+        && data.userId.size() >= 1
+        && data.userId.size() <= 128
+        && data.customerName is string
+        && data.customerName.size() >= 1
+        && data.customerName.size() <= 120
+        && data.customerEmail is string
+        && data.customerEmail.size() >= 3
+        && data.customerEmail.size() <= 160
+        && data.customerPhone is string
+        && data.customerPhone.size() >= 7
+        && data.customerPhone.size() <= 20
+        && data.templeId is string
+        && data.templeId.size() >= 1
+        && data.templeId.size() <= 80
+        && data.templeId.matches('^[a-z0-9\\-]+$')
+        && data.templeName is string
+        && data.templeName.size() >= 1
+        && data.templeName.size() <= 160
+        && data.items is list
+        && data.items.size() >= 1
+        && data.items.size() <= 25
+        && data.items[0] is map
+        && data.items[0].keys().hasAll([
+          'poojaName', 'category', 'devoteeName', 'nakshatra',
+          'poojaDate', 'quantity', 'unitPrice', 'subtotal'
+        ])
+        && data.items[0].keys().hasOnly([
+          'poojaName', 'category', 'devoteeName', 'nakshatra',
+          'poojaDate', 'quantity', 'unitPrice', 'subtotal'
+        ])
+        && data.items[0].poojaName is string
+        && data.items[0].poojaName.size() >= 1
+        && data.items[0].poojaName.size() <= 120
+        && data.items[0].category is string
+        && data.items[0].category.size() >= 1
+        && data.items[0].category.size() <= 60
+        && data.items[0].devoteeName is string
+        && data.items[0].devoteeName.size() >= 1
+        && data.items[0].devoteeName.size() <= 120
+        && data.items[0].nakshatra is string
+        && data.items[0].nakshatra.size() >= 1
+        && data.items[0].nakshatra.size() <= 40
+        && data.items[0].poojaDate is string
+        && data.items[0].poojaDate.size() >= 8
+        && data.items[0].poojaDate.size() <= 20
+        && data.items[0].quantity is number
+        && data.items[0].quantity >= 1
+        && data.items[0].quantity <= 50
+        && data.items[0].unitPrice is number
+        && data.items[0].unitPrice > 0
+        && data.items[0].subtotal is number
+        && data.items[0].subtotal == data.items[0].unitPrice * data.items[0].quantity
+        && isValidPrasadamAndDelivery(data)
+        && data.subtotalAmount is number
+        && data.subtotalAmount > 0
+        && data.convenienceFee is number
+        && data.convenienceFee == 5
+        && data.totalAmount is number
+        && data.totalAmount == data.subtotalAmount + data.convenienceFee + data.deliveryFee
+        && data.paymentMethod in ['UPI', 'Credit/Debit Card', 'NetBanking']
+        && data.transactionId is string
+        && data.transactionId.size() >= 5
+        && data.transactionId.size() <= 64
+        && data.paymentStatus == 'SUCCESS'
+        && data.deviceType in ['Mobile', 'Desktop']
+        && data.createdAt is timestamp;
+    }
+
+    function isValidBookingCreate(data, bookingId) {
+      return data.keys().hasAll([
+          'bookingId', 'userId', 'customerName', 'customerEmail', 'customerPhone',
+          'templeId', 'templeName', 'items', 'prasadamDelivery', 'deliveryAddress',
+          'subtotalAmount', 'convenienceFee', 'deliveryFee', 'totalAmount',
+          'paymentMethod', 'transactionId', 'paymentStatus', 'bookingStatus',
+          'cancellationDeadline', 'createdAt', 'deviceType'
+        ])
+        && data.keys().hasOnly([
+          'bookingId', 'userId', 'customerName', 'customerEmail', 'customerPhone',
+          'templeId', 'templeName', 'items', 'prasadamDelivery', 'deliveryAddress',
+          'subtotalAmount', 'convenienceFee', 'deliveryFee', 'totalAmount',
+          'paymentMethod', 'transactionId', 'paymentStatus', 'bookingStatus',
+          'cancellationDeadline', 'createdAt', 'deviceType'
+        ])
+        && isValidBookingCore(data, bookingId)
+        && data.userId == request.auth.uid
+        && data.bookingStatus == 'CONFIRMED'
+        && data.cancellationDeadline is timestamp
+        && data.createdAt == request.time;
+    }
+
+    function isValidBookingCancel(data, bookingId) {
+      return data.keys().hasAll([
+          'bookingId', 'userId', 'customerName', 'customerEmail', 'customerPhone',
+          'templeId', 'templeName', 'items', 'prasadamDelivery', 'deliveryAddress',
+          'subtotalAmount', 'convenienceFee', 'deliveryFee', 'totalAmount',
+          'paymentMethod', 'transactionId', 'paymentStatus', 'bookingStatus',
+          'cancelledAt', 'cancellationReason', 'cancelledBy',
+          'createdAt', 'deviceType'
+        ])
+        && data.keys().hasOnly([
+          'bookingId', 'userId', 'customerName', 'customerEmail', 'customerPhone',
+          'templeId', 'templeName', 'items', 'prasadamDelivery', 'deliveryAddress',
+          'subtotalAmount', 'convenienceFee', 'deliveryFee', 'totalAmount',
+          'paymentMethod', 'transactionId', 'paymentStatus', 'bookingStatus',
+          'cancellationDeadline', 'cancelledAt', 'cancellationReason', 'cancelledBy',
+          'createdAt', 'deviceType'
+        ])
+        && isValidBookingCore(data, bookingId)
+        && data.bookingStatus == 'CANCELLED'
+        && (!('cancellationDeadline' in data) || data.cancellationDeadline is timestamp)
+        && data.cancelledAt is timestamp
+        && data.cancelledAt == request.time
+        && data.cancellationReason is string
+        && data.cancellationReason.size() >= 1
+        && data.cancellationReason.size() <= 240
+        && data.cancelledBy is string
+        && data.cancelledBy.size() >= 1
+        && data.cancelledBy.size() <= 160;
+    }
+
+    // -------------------------------------------------------------------------
+    // Collection Rules: /users/{userId} (PII strictly owner-only or admin)
+    // -------------------------------------------------------------------------
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if false;
+      allow create: if isSignedIn()
+        && isValidId(userId)
+        && isOwner(userId)
+        && isValidUserCreate(incoming());
+      allow update: if isSignedIn()
+        && isValidId(userId)
+        && isOwner(userId)
+        && isValidUserUpdate(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'email', 'phone', 'lastLoginAt']);
+      allow delete: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Collection Rules: /bookings/{bookingId}
+    // -------------------------------------------------------------------------
+    match /bookings/{bookingId} {
+      allow get: if isSignedIn()
+        && isValidId(bookingId)
+        && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn()
+        && (resource.data.userId == request.auth.uid || isBootstrappedAdmin());
+      allow create: if isSignedIn()
+        && isValidId(bookingId)
+        && isValidBookingCreate(incoming(), bookingId);
+      allow update: if isSignedIn()
+        && isValidId(bookingId)
+        && isValidBookingCancel(incoming(), bookingId)
+        && (
+          isAdmin()
+          || (
+            existing().userId == request.auth.uid
+            && (!('cancellationDeadline' in existing()) || request.time <= existing().cancellationDeadline)
+          )
+        )
+        && (!('bookingStatus' in existing()) || existing().bookingStatus != 'CANCELLED')
+        && incoming().bookingId == existing().bookingId
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && (!('cancellationDeadline' in existing()) || incoming().cancellationDeadline == existing().cancellationDeadline)
+        && incoming().subtotalAmount == existing().subtotalAmount
+        && incoming().convenienceFee == existing().convenienceFee
+        && incoming().deliveryFee == existing().deliveryFee
+        && incoming().totalAmount == existing().totalAmount
+        && incoming().paymentStatus == existing().paymentStatus
+        && incoming().items == existing().items
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'bookingStatus', 'cancelledAt', 'cancellationReason', 'cancelledBy'
+        ]);
+      allow delete: if false;
+    }
+  }
+}
